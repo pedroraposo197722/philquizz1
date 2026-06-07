@@ -170,6 +170,17 @@ wss.on("connection", ws => {
       return;
     }
 
+    if (msg.type === "resetGame") {
+      if (game.timer) { clearTimeout(game.timer); game.timer = null; }
+      game.phase  = "lobby";
+      game.qIndex = -1;
+      game.players.clear();
+      game.hosts.forEach(h => {
+        if (h.readyState === 1) h.send(JSON.stringify({ type: "reset" }));
+      });
+      return;
+    }
+
     if (msg.type === "playerJoin") {
       // Permite entrar mesmo depois do lobby — apenas bloqueia se jogo já começou
       if (game.phase !== "lobby") {

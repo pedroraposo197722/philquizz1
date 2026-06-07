@@ -258,6 +258,7 @@
   <img id="qrImg" src="" alt="QR Code">
   <div id="playerList"></div>
   <button id="startBtn" onclick="startGame()">▶ Iniciar Jogo</button>
+  <button onclick="resetGame()" style="margin-top:8px;padding:10px 32px;font-size:1rem;border:none;border-radius:8px;background:#555;color:#fff;cursor:pointer">↺ Reiniciar / Limpar jogadores</button>
 </div>
 
 <!-- QUESTION -->
@@ -288,6 +289,7 @@
     <div id="answerProgress">0 respostas</div>
     <div style="display:flex;gap:10px">
       <button class="ctrlBtn" id="revealBtn" onclick="revealNow()">Revelar Já</button>
+      <button class="ctrlBtn" id="resetBtn" onclick="resetGame()" style="background:#555">↺ Reiniciar</button>
       <button class="ctrlBtn" id="rankingBtn" onclick="showRanking()">Ver Ranking</button>
       <button class="ctrlBtn" id="nextBtn" onclick="nextQuestion()">Próxima →</button>
     </div>
@@ -383,6 +385,21 @@ function handleMsg(msg) {
 
     case "end":
       showEnd(msg.ranking);
+      break;
+
+    case "reset":
+      document.getElementById("lobby").style.display        = "flex";
+      document.getElementById("questionScreen").style.display = "none";
+      document.getElementById("rankingScreen").style.display  = "none";
+      document.getElementById("endScreen").style.display     = "none";
+      document.getElementById("playerList").innerHTML = "";
+      document.getElementById("joinUrl").textContent = "A carregar…";
+      fetch("/qr").then(r=>r.json()).then(d => {
+        document.getElementById("qrImg").src = d.dataUrl;
+        document.getElementById("joinUrl").textContent = d.url;
+      });
+      stopTimer();
+      stopMusic();
       break;
   }
 }
@@ -501,6 +518,11 @@ function revealOptions(correta, counts) {
 
 function revealNow() {
   ws.send(JSON.stringify({ type: "revealNow" }));
+}
+
+function resetGame() {
+  if (!confirm("Reiniciar o jogo? Todos os jogadores e pontos são apagados.")) return;
+  ws.send(JSON.stringify({ type: "resetGame" }));
 }
 
 function showRanking() {
