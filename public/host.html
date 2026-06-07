@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<title>Quiz — Apresentador</title>
+<style>
+  :root {
+    --verde:    #2ecc71;
+    --vermelho: #e74c3c;
+    --azul:     #3498db;
+    --amarelo:  #f1c40f;
+    --laranja:  #e67e22;
+    --roxo:     #9b59b6;
+    --bg:       #1a1a2e;
+    --card:     #16213e;
+    --text:     #eaeaea;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ── LOBBY ── */
+  #lobby {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 24px;
+  }
+  #lobby h1 { font-size: 2.4rem; }
+  #lobby .url { font-size: 1.5rem; color: var(--amarelo); font-weight: bold; }
+  #qrImg { width: 220px; border-radius: 12px; background:#fff; padding:8px; }
+  #playerList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    max-width: 900px;
+  }
+  .playerTag {
+    background: var(--card);
+    border: 2px solid var(--verde);
+    border-radius: 8px;
+    padding: 6px 16px;
+    font-size: 1.1rem;
+  }
+  #startBtn {
+    margin-top: 16px;
+    padding: 16px 48px;
+    font-size: 1.4rem;
+    border: none;
+    border-radius: 12px;
+    background: var(--verde);
+    color: #fff;
+    cursor: pointer;
+    font-weight: bold;
+  }
+  #startBtn:hover { opacity: .85; }
+
+  /* ── QUESTION SCREEN ── */
+  #questionScreen {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    padding: 0;
+  }
+
+  /* Top bar: pergunta + timer */
+  #topBar {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 32px 16px;
+  }
+  #questionText {
+    flex: 1;
+    font-size: 2rem;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+
+  /* TIMER — grande, circular */
+  #timerWrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 120px;
+  }
+  #timerLabel {
+    font-size: .85rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #aaa;
+  }
+  #timerCircle {
+    position: relative;
+    width: 110px;
+    height: 110px;
+  }
+  #timerCircle svg {
+    transform: rotate(-90deg);
+    width: 110px;
+    height: 110px;
+  }
+  #timerCircle circle {
+    fill: none;
+    stroke-width: 8;
+  }
+  #timerBg   { stroke: #333; }
+  #timerArc  { stroke: var(--verde); stroke-linecap: round; transition: stroke-dashoffset .95s linear, stroke .3s; }
+  #timerNum {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.4rem;
+    font-weight: 900;
+    color: var(--text);
+  }
+
+  /* Área do vídeo */
+  #videoWrap {
+    display: flex;
+    justify-content: center;
+    padding: 0 32px 8px;
+  }
+  #videoWrap video {
+    max-height: 38vh;
+    max-width: 100%;
+    border-radius: 12px;
+    background: #000;
+  }
+  #videoMsg {
+    text-align: center;
+    font-size: 1rem;
+    color: var(--amarelo);
+    padding: 4px 0 8px;
+    display: none;
+  }
+
+  /* Opções */
+  #optionsGrid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    padding: 8px 32px 16px;
+  }
+  .optCard {
+    border-radius: 14px;
+    padding: 20px 16px;
+    font-size: 1.8rem;
+    font-weight: 800;
+    text-align: center;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    min-height: 80px;
+    position: relative;
+    transition: opacity .3s;
+  }
+  .optCard .optLetter {
+    font-size: 1.1rem;
+    font-weight: 900;
+    opacity: .7;
+  }
+  .optCard .optCount {
+    position: absolute;
+    bottom: 8px;
+    right: 14px;
+    font-size: 1rem;
+    opacity: .8;
+  }
+  .optCard.wrong { opacity: .3; }
+  .optCard.correct { outline: 5px solid #fff; }
+
+  /* Barra de estado */
+  #statusBar {
+    background: var(--card);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  #answerProgress {
+    font-size: 1rem;
+    color: #ccc;
+  }
+  .ctrlBtn {
+    padding: 10px 28px;
+    font-size: 1rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+    color: #fff;
+  }
+  #revealBtn   { background: var(--laranja); }
+  #nextBtn     { background: var(--azul); display:none; }
+  #rankingBtn  { background: var(--roxo);  display:none; }
+
+  /* ── RANKING ── */
+  #rankingScreen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 16px;
+    padding: 24px;
+  }
+  #rankingScreen h2 { font-size: 2.2rem; }
+  .rankRow {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
+    max-width: 600px;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 1.3rem;
+  }
+  .rankPos { font-size: 1.8rem; font-weight: 900; width: 40px; text-align:center; }
+  .rankName { flex: 1; }
+  .rankScore { font-weight: 800; color: var(--amarelo); }
+
+  /* ── END ── */
+  #endScreen {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    gap: 20px;
+  }
+  #endScreen h2 { font-size: 2.4rem; }
+</style>
+</head>
+<body>
+
+<!-- LOBBY -->
+<div id="lobby">
+  <h1>🎮 Quiz ao Vivo</h1>
+  <div class="url" id="joinUrl">A carregar…</div>
+  <img id="qrImg" src="" alt="QR Code">
+  <div id="playerList"></div>
+  <button id="startBtn" onclick="startGame()">▶ Iniciar Jogo</button>
+</div>
+
+<!-- QUESTION -->
+<div id="questionScreen">
+  <div id="topBar">
+    <div id="questionText"></div>
+    <div id="timerWrap">
+      <div id="timerLabel">Tempo</div>
+      <div id="timerCircle">
+        <svg viewBox="0 0 110 110">
+          <circle class="timerBg"  id="timerBg"  cx="55" cy="55" r="46"/>
+          <circle class="timerArc" id="timerArc" cx="55" cy="55" r="46"
+            stroke-dasharray="289" stroke-dashoffset="0"/>
+        </svg>
+        <div id="timerNum">–</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="videoWrap" style="display:none">
+    <video id="questionVideo" controls></video>
+  </div>
+  <div id="videoMsg">▶ Vídeo a tocar — temporizador começa quando acabar</div>
+
+  <div id="optionsGrid"></div>
+
+  <div id="statusBar">
+    <div id="answerProgress">0 respostas</div>
+    <div style="display:flex;gap:10px">
+      <button class="ctrlBtn" id="revealBtn" onclick="revealNow()">Revelar Já</button>
+      <button class="ctrlBtn" id="rankingBtn" onclick="showRanking()">Ver Ranking</button>
+      <button class="ctrlBtn" id="nextBtn" onclick="nextQuestion()">Próxima →</button>
+    </div>
+  </div>
+</div>
+
+<!-- RANKING -->
+<div id="rankingScreen">
+  <h2>🏆 Ranking</h2>
+  <div id="rankingList"></div>
+  <button class="ctrlBtn" id="nextAfterRankBtn" onclick="nextQuestion()" style="background:var(--azul);margin-top:8px;font-size:1.1rem;padding:12px 36px;display:none">Próxima Pergunta →</button>
+</div>
+
+<!-- END -->
+<div id="endScreen">
+  <h2>🎉 Fim do Jogo!</h2>
+  <div id="endRanking"></div>
+</div>
+
+<script>
+const COLORS = ["#e74c3c","#3498db","#2ecc71","#f1c40f","#e67e22","#9b59b6"];
+const LETTERS = ["A","B","C","D"];
+const CIRCUMFERENCE = 2 * Math.PI * 46; // ≈ 289
+
+let ws, totalTime = 30, timerInterval = null, timerLeft = 0;
+let currentQuestion = null, totalPlayers = 0, answeredCount = 0;
+let isRevealed = false, isLastQuestion = false;
+
+// Música de fundo durante o timer
+const bgMusic = new Audio();
+bgMusic.loop = false;
+function playMusic(file) {
+  bgMusic.src = `/videos/${file}`;
+  bgMusic.currentTime = 0;
+  bgMusic.play().catch(() => {});
+}
+function stopMusic() {
+  bgMusic.pause();
+  bgMusic.currentTime = 0;
+}
+
+function connect() {
+  ws = new WebSocket(`ws://${location.host}`);
+  ws.onopen = () => {
+    ws.send(JSON.stringify({ type: "hostJoin" }));
+    fetch("/qr").then(r=>r.json()).then(d => {
+      document.getElementById("qrImg").src = d.dataUrl;
+      document.getElementById("joinUrl").textContent = d.url;
+    });
+  };
+  ws.onmessage = e => handleMsg(JSON.parse(e.data));
+  ws.onclose   = () => setTimeout(connect, 1000);
+}
+
+function handleMsg(msg) {
+  switch (msg.type) {
+
+    case "playerList":
+      totalPlayers = msg.players.length;
+      renderPlayerList(msg.players);
+      break;
+
+    case "question":
+      isRevealed = false;
+      isLastQuestion = (msg.index === msg.total - 1);
+      currentQuestion = msg;
+      showQuestion(msg);
+      break;
+
+    case "timerStart":
+      startVisualTimer(msg.seconds, msg.musica || null);
+      break;
+
+    case "answerCount":
+      answeredCount = msg.answered;
+      document.getElementById("answerProgress").textContent =
+        `${msg.answered} / ${msg.total} responderam`;
+      updateOptionCounts(msg.counts);
+      break;
+
+    case "reveal":
+      stopTimer();
+      isRevealed = true;
+      revealOptions(msg.correta, msg.counts);
+      document.getElementById("revealBtn").style.display  = "none";
+      document.getElementById("rankingBtn").style.display = "inline-block";
+      document.getElementById("nextBtn").style.display    = isLastQuestion ? "none" : "inline-block";
+      break;
+
+    case "ranking":
+      showRankingScreen(msg.ranking, !isLastQuestion);
+      break;
+
+    case "end":
+      showEnd(msg.ranking);
+      break;
+  }
+}
+
+function renderPlayerList(players) {
+  const el = document.getElementById("playerList");
+  el.innerHTML = players.map(p =>
+    `<div class="playerTag">👤 ${p.name}</div>`).join("");
+}
+
+function startGame() {
+  ws.send(JSON.stringify({ type: "startGame" }));
+}
+
+function showQuestion(q) {
+  document.getElementById("lobby").style.display        = "none";
+  document.getElementById("rankingScreen").style.display = "none";
+  document.getElementById("endScreen").style.display    = "none";
+  document.getElementById("questionScreen").style.display = "flex";
+
+  document.getElementById("questionText").textContent = q.texto;
+  document.getElementById("answerProgress").textContent = "0 respostas";
+  document.getElementById("revealBtn").style.display  = "inline-block";
+  document.getElementById("rankingBtn").style.display = "none";
+  document.getElementById("nextBtn").style.display    = "none";
+
+  // Timer — mostra traço enquanto aguarda vídeo
+  setTimerDisplay(q.tempo, q.tempo);
+
+  // Vídeo
+  const videoWrap = document.getElementById("videoWrap");
+  const videoEl   = document.getElementById("questionVideo");
+  const videoMsg  = document.getElementById("videoMsg");
+
+  if (q.video) {
+    videoWrap.style.display = "flex";
+    videoMsg.style.display  = "block";
+    videoEl.src = `/videos/${q.video}`;
+    videoEl.load();
+    videoEl.play().catch(()=>{});
+    videoEl.onended = () => {
+      videoMsg.textContent = "✅ Vídeo terminado — temporizador a contar!";
+      ws.send(JSON.stringify({ type: "videoEnded" }));
+    };
+  } else {
+    videoWrap.style.display = "none";
+    videoMsg.style.display  = "none";
+    videoEl.src = "";
+  }
+
+  // Opções
+  const grid = document.getElementById("optionsGrid");
+  grid.innerHTML = q.opcoes.map((opt, i) => `
+    <div class="optCard" id="opt${i}" style="background:${COLORS[i]}">
+      <span class="optLetter">${LETTERS[i]}</span>
+      <span>${opt}</span>
+      <span class="optCount" id="cnt${i}">0</span>
+    </div>`).join("");
+}
+
+/* ── Timer visual ── */
+function startVisualTimer(seconds, musicFile) {
+  totalTime = seconds;
+  timerLeft = seconds;
+
+  if (musicFile) playMusic(musicFile);
+
+  timerInterval = setInterval(() => {
+    timerLeft--;
+    setTimerDisplay(timerLeft, totalTime);
+    if (timerLeft <= 0) stopTimer();
+  }, 1000);
+  setTimerDisplay(timerLeft, totalTime);
+}
+
+function setTimerDisplay(left, total) {
+  const arc = document.getElementById("timerArc");
+  const num = document.getElementById("timerNum");
+
+  const ratio  = total > 0 ? left / total : 0;
+  const offset = CIRCUMFERENCE * (1 - ratio);
+  arc.style.strokeDashoffset = offset;
+
+  // Cor muda conforme o tempo
+  if (left > total * .5)       arc.style.stroke = "#2ecc71";
+  else if (left > total * .25) arc.style.stroke = "#f1c40f";
+  else                         arc.style.stroke = "#e74c3c";
+
+  num.textContent = left > 0 ? left : (left === 0 ? "0" : "–");
+}
+
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+  stopMusic();
+}
+
+function updateOptionCounts(counts) {
+  counts.forEach((c, i) => {
+    const el = document.getElementById(`cnt${i}`);
+    if (el) el.textContent = c;
+  });
+}
+
+function revealOptions(correta, counts) {
+  if (currentQuestion) {
+    currentQuestion.opcoes.forEach((_, i) => {
+      const el = document.getElementById(`opt${i}`);
+      if (!el) return;
+      if (i === correta) el.classList.add("correct");
+      else               el.classList.add("wrong");
+      const cnt = document.getElementById(`cnt${i}`);
+      if (cnt && counts) cnt.textContent = counts[i];
+    });
+  }
+}
+
+function revealNow() {
+  ws.send(JSON.stringify({ type: "revealNow" }));
+}
+
+function showRanking() {
+  ws.send(JSON.stringify({ type: "showRanking" }));
+}
+
+function nextQuestion() {
+  ws.send(JSON.stringify({ type: "nextQuestion" }));
+}
+
+function showRankingScreen(ranking, hasNext) {
+  document.getElementById("questionScreen").style.display = "none";
+  document.getElementById("rankingScreen").style.display  = "flex";
+
+  const medals = ["🥇","🥈","🥉"];
+  document.getElementById("rankingList").innerHTML =
+    ranking.slice(0,10).map((p,i) => `
+      <div class="rankRow">
+        <div class="rankPos">${medals[i] || (i+1)+"º"}</div>
+        <div class="rankName">${p.name}</div>
+        <div class="rankScore">${p.score} pts</div>
+      </div>`).join("");
+
+  const nb = document.getElementById("nextAfterRankBtn");
+  nb.style.display = hasNext ? "inline-block" : "none";
+}
+
+function showEnd(ranking) {
+  document.getElementById("rankingScreen").style.display = "none";
+  document.getElementById("questionScreen").style.display = "none";
+  document.getElementById("endScreen").style.display     = "flex";
+
+  const medals = ["🥇","🥈","🥉"];
+  document.getElementById("endRanking").innerHTML =
+    ranking.slice(0,5).map((p,i) => `
+      <div class="rankRow">
+        <div class="rankPos">${medals[i] || (i+1)+"º"}</div>
+        <div class="rankName">${p.name}</div>
+        <div class="rankScore">${p.score} pts</div>
+      </div>`).join("");
+}
+
+connect();
+</script>
+</body>
+</html>
