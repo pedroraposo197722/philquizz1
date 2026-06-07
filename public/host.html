@@ -337,6 +337,8 @@ function stopMusic() {
   bgMusic.currentTime = 0;
 }
 
+let hostPingInterval = null;
+
 function connect() {
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
   ws.onopen = () => {
@@ -345,9 +347,16 @@ function connect() {
       document.getElementById("qrImg").src = d.dataUrl;
       document.getElementById("joinUrl").textContent = d.url;
     });
+    if (hostPingInterval) clearInterval(hostPingInterval);
+    hostPingInterval = setInterval(() => {
+      if (ws.readyState === 1) ws.send(JSON.stringify({ type: "ping" }));
+    }, 20000);
   };
   ws.onmessage = e => handleMsg(JSON.parse(e.data));
-  ws.onclose   = () => setTimeout(connect, 1000);
+  ws.onclose = () => {
+    if (hostPingInterval) { clearInterval(hostPingInterval); hostPingInterval = null; }
+    setTimeout(connect, 1000);
+  };
 }
 
 function handleMsg(msg) {

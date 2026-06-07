@@ -101,10 +101,18 @@ function revealAnswers() {
 // ── WebSocket ─────────────────────────────────────────────────
 wss.on("connection", ws => {
   ws.isAlive = true;
+  
   ws.on("pong", heartbeat);
   ws.on("message", raw => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
+
+    // Responde ao ping do cliente
+    if (msg.type === "ping") {
+      ws.isAlive = true;
+      if (ws.readyState === 1) ws.send(JSON.stringify({ type: "pong" }));
+      return;
+    }
 
     if (msg.type === "hostJoin") {
       game.hosts.add(ws);
@@ -213,12 +221,16 @@ wss.on("connection", ws => {
         game.players.delete(existingWs);
         game.players.set(ws, p);
         send(ws, { type: "joined", name, score: p.score, reconnect: true });
-        // Se jogo em curso, manda estado actual
+        // Manda estado actual ao jogador reconectado
         if (game.phase === "question" && !p.answered) {
           const q = questions[game.qIndex];
           send(ws, { type: "canAnswer", opcoes: q.opcoes });
+        } else if (game.phase === "video") {
+          send(ws, { type: "waiting", msg: "Aguarda o vídeo no ecrã…" });
         } else if (game.phase === "reveal" || p.answered) {
           send(ws, { type: "waiting", msg: "Aguarda a próxima pergunta…" });
+        } else if (game.phase === "lobby") {
+          send(ws, { type: "waiting", msg: "Aguarda o início do jogo…" });
         }
       } else if (game.phase !== "lobby") {
         send(ws, { type: "error", msg: "O jogo já começou." });

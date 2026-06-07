@@ -138,12 +138,40 @@ const LETTERS = ["A","B","C","D"];
 
 let ws, score = 0, myName = "", answered = false, canAnswer = false;
 
+let pingInterval = null;
+let playerName = "";
+let currentView = "joinView"; // track what screen we're on
+
 function connect() {
   ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
   ws.onmessage = e => handleMsg(JSON.parse(e.data));
-  ws.onopen = () => { /* ligação estabelecida */ };
-  ws.onclose   = () => setTimeout(connect, 1500);
+  ws.onopen = () => {
+    // Ping every 15s to keep connection alive (below Railway's 60s timeout)
+    if (pingInterval) clearInterval(pingInterval);
+    pingInterval = setInterval(() => {
+      if (ws.readyState === 1) ws.send(JSON.stringify({ type: "ping" }));
+    }, 15000);
+    // Auto-rejoin silently if we had a name (reconnection)
+    if (playerName) {
+      ws.send(JSON.stringify({ type: "playerJoin", name: playerName }));
+    }
+  };
+  ws.onclose = () => {
+    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+    // Reconnect quickly and silently
+    setTimeout(connect, 1000);
+  };
+  ws.onerror = () => {
+    ws.close();
+  };
 }
+
+// Keep-alive via Page Visibility API — reconnect when tab becomes visible again
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && ws.readyState !== 1) {
+    connect();
+  }
+});
 
 function handleMsg(msg) {
   switch(msg.type) {
@@ -187,6 +215,7 @@ function handleMsg(msg) {
 function joinGame() {
   const name = document.getElementById("nameInput").value.trim();
   if (!name) return;
+  playerName = name;
   ws.send(JSON.stringify({ type: "playerJoin", name }));
 }
 
