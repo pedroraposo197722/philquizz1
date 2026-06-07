@@ -139,7 +139,7 @@ const LETTERS = ["A","B","C","D"];
 let ws, score = 0, myName = "", answered = false, canAnswer = false;
 
 function connect() {
-  ws = new WebSocket(`ws://${location.host}`);
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
   ws.onmessage = e => handleMsg(JSON.parse(e.data));
   ws.onclose   = () => setTimeout(connect, 1500);
 }

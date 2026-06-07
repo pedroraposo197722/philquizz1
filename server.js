@@ -5,28 +5,30 @@ const express = require("express");
 const http    = require("http");
 const { WebSocketServer } = require("ws");
 const QRCode  = require("qrcode");
-const os      = require("os");
 const questions = require("./questions");
 
 const PORT = process.env.PORT || 3000;
 
-function getLocalIP() {
-  const nets = os.networkInterfaces();
-  for (const name of Object.keys(nets))
-    for (const net of nets[name])
-      if (net.family === "IPv4" && !net.internal) return net.address;
-  return "localhost";
+// No Railway, usa o domínio público; localmente usa o IP
+function getPublicURL(req) {
+  // Railway injeta RAILWAY_PUBLIC_DOMAIN
+  if (process.env.RAILWAY_PUBLIC_DOMAIN)
+    return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+  // Fallback: usa o host do request
+  const host = req ? req.headers.host : null;
+  if (host) return `http://${host}`;
+  return `http://localhost:${PORT}`;
 }
-const LOCAL_IP = getLocalIP();
-const JOIN_URL = `http://${LOCAL_IP}:${PORT}/play`;
 
 const app = express();
 app.use(express.static(__dirname + "/public"));
 app.get("/",     (_, res) => res.sendFile(__dirname + "/public/host.html"));
 app.get("/play", (_, res) => res.sendFile(__dirname + "/public/player.html"));
-app.get("/qr",   async (_, res) => {
-  const dataUrl = await QRCode.toDataURL(JOIN_URL, { width: 600, margin: 1 });
-  res.json({ dataUrl, url: JOIN_URL });
+app.get("/qr",   async (req, res) => {
+  const base    = getPublicURL(req);
+  const joinURL = `${base}/play`;
+  const dataUrl = await QRCode.toDataURL(joinURL, { width: 600, margin: 1 });
+  res.json({ dataUrl, url: joinURL });
 });
 
 const server = http.createServer(app);
@@ -34,9 +36,9 @@ const wss    = new WebSocketServer({ server });
 
 // ── Estado do jogo ────────────────────────────────────────────
 const game = {
-  phase:         "lobby",   // lobby | video | question | reveal | ranking | end
+  phase:         "lobby",
   qIndex:        -1,
-  players:       new Map(), // ws → {name, score, answered, answerIdx, answerTime}
+  players:       new Map(),
   hosts:         new Set(),
   questionStart: 0,
   timer:         null,
@@ -70,12 +72,9 @@ function answerCounts() {
 
 function startQuestionTimer() {
   const q   = questions[game.qIndex];
-  const sec = q.tempo || 30;
+  const sec = q.tempo || 45;
   game.questionStart = Date.now();
-
-  // Avisa hosts e players que o timer arrancou
   sendHosts({ type: "timerStart", seconds: sec, musica: q.musica || null });
-
   game.timer = setTimeout(() => revealAnswers(), sec * 1000);
 }
 
@@ -93,10 +92,9 @@ wss.on("connection", ws => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
 
-    // ── HOST ──────────────────────────────────────────────────
     if (msg.type === "hostJoin") {
       game.hosts.add(ws);
-      send(ws, { type: "welcome", role: "host", url: JOIN_URL, players: playerList() });
+      send(ws, { type: "welcome", role: "host", players: playerList() });
       return;
     }
 
@@ -109,19 +107,13 @@ wss.on("connection", ws => {
         Object.assign(p, { answered: false, answerIdx: -1, answerTime: 0 });
 
       sendHosts({
-        type:    "question",
-        index:   0,
-        total:   questions.length,
-        texto:   q.texto,
-        opcoes:  q.opcoes,
-        video:   q.video  || null,
-        imagem:  q.imagem || null,
-        tempo:   q.tempo  || 30,
-        hasVideo: !!q.video,
+        type: "question", index: 0, total: questions.length,
+        texto: q.texto, opcoes: q.opcoes,
+        video: q.video || null, imagem: q.imagem || null,
+        tempo: q.tempo || 45, hasVideo: !!q.video,
       });
       sendPlayers({ type: "question", opcoes: q.opcoes, texto: q.texto });
 
-      // Se não tem vídeo, arranca o timer já
       if (!q.video) {
         sendPlayers({ type: "canAnswer", opcoes: q.opcoes });
         startQuestionTimer();
@@ -129,12 +121,11 @@ wss.on("connection", ws => {
       return;
     }
 
-    // Host informa que o vídeo terminou → arranca timer
     if (msg.type === "videoEnded") {
       if (game.phase === "video") {
         game.phase = "question";
         const q = questions[game.qIndex];
-        sendPlayers({ type: "canAnswer", opcoes: q.opcoes }); // players podem ver os botões
+        sendPlayers({ type: "canAnswer", opcoes: q.opcoes });
         startQuestionTimer();
       }
       return;
@@ -155,15 +146,10 @@ wss.on("connection", ws => {
         Object.assign(p, { answered: false, answerIdx: -1, answerTime: 0 });
 
       sendHosts({
-        type:    "question",
-        index:   game.qIndex,
-        total:   questions.length,
-        texto:   q.texto,
-        opcoes:  q.opcoes,
-        video:   q.video  || null,
-        imagem:  q.imagem || null,
-        tempo:   q.tempo  || 30,
-        hasVideo: !!q.video,
+        type: "question", index: game.qIndex, total: questions.length,
+        texto: q.texto, opcoes: q.opcoes,
+        video: q.video || null, imagem: q.imagem || null,
+        tempo: q.tempo || 45, hasVideo: !!q.video,
       });
       sendPlayers({ type: "question", opcoes: q.opcoes, texto: q.texto });
 
@@ -184,14 +170,19 @@ wss.on("connection", ws => {
       return;
     }
 
-    // ── PLAYER ────────────────────────────────────────────────
     if (msg.type === "playerJoin") {
+      // Permite entrar mesmo depois do lobby — apenas bloqueia se jogo já começou
       if (game.phase !== "lobby") {
         send(ws, { type: "error", msg: "O jogo já começou." });
         return;
       }
       const name = String(msg.name || "").trim().slice(0, 20);
       if (!name) { send(ws, { type: "error", msg: "Nome inválido." }); return; }
+      // Verifica nome duplicado
+      const names = [...game.players.values()].map(p => p.name.toLowerCase());
+      if (names.includes(name.toLowerCase())) {
+        send(ws, { type: "error", msg: "Nome já em uso." }); return;
+      }
       game.players.set(ws, { name, score: 0, answered: false, answerIdx: -1, answerTime: 0 });
       send(ws, { type: "joined", name });
       sendHosts({ type: "playerList", players: playerList() });
@@ -203,7 +194,7 @@ wss.on("connection", ws => {
       if (!p || p.answered || game.phase !== "question") return;
       const q       = questions[game.qIndex];
       const elapsed = Date.now() - game.questionStart;
-      const maxTime = (q.tempo || 30) * 1000;
+      const maxTime = (q.tempo || 45) * 1000;
       const idx     = Number(msg.index);
       if (idx < 0 || idx >= q.opcoes.length) return;
 
@@ -218,11 +209,9 @@ wss.on("connection", ws => {
 
       send(ws, { type: "answerAck", selected: idx });
 
-      // Contagem ao vivo para o host
       const answered = [...game.players.values()].filter(x => x.answered).length;
       sendHosts({ type: "answerCount", answered, total: game.players.size, counts: answerCounts() });
 
-      // Se todos responderam, revelar automaticamente
       if (answered === game.players.size) revealAnswers();
       return;
     }
@@ -239,6 +228,5 @@ wss.on("connection", ws => {
 
 server.listen(PORT, () => {
   console.log(`\n✅  Servidor em http://localhost:${PORT}`);
-  console.log(`📱  Link para jogadores: ${JOIN_URL}`);
   console.log(`\n    Ctrl+C para parar\n`);
 });

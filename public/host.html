@@ -330,7 +330,7 @@ function stopMusic() {
 }
 
 function connect() {
-  ws = new WebSocket(`ws://${location.host}`);
+  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
   ws.onopen = () => {
     ws.send(JSON.stringify({ type: "hostJoin" }));
     fetch("/qr").then(r=>r.json()).then(d => {
