@@ -196,20 +196,42 @@ wss.on("connection", ws => {
     }
 
     if (msg.type === "playerJoin") {
-      // Permite entrar mesmo depois do lobby — apenas bloqueia se jogo já começou
-      if (game.phase !== "lobby") {
-        send(ws, { type: "error", msg: "O jogo já começou." });
-        return;
-      }
       const name = String(msg.name || "").trim().slice(0, 20);
       if (!name) { send(ws, { type: "error", msg: "Nome inválido." }); return; }
-      // Verifica nome duplicado
-      const names = [...game.players.values()].map(p => p.name.toLowerCase());
-      if (names.includes(name.toLowerCase())) {
-        send(ws, { type: "error", msg: "Nome já em uso." }); return;
+
+      // Verifica se já existe jogador com este nome (reconexão)
+      let existingWs = null;
+      for (const [w, p] of game.players.entries()) {
+        if (p.name.toLowerCase() === name.toLowerCase()) {
+          existingWs = w; break;
+        }
       }
-      game.players.set(ws, { name, score: 0, answered: false, answerIdx: -1, answerTime: 0 });
-      send(ws, { type: "joined", name });
+
+      if (existingWs) {
+        // Reconexão — transfere o estado para o novo ws
+        const p = game.players.get(existingWs);
+        game.players.delete(existingWs);
+        game.players.set(ws, p);
+        send(ws, { type: "joined", name, score: p.score, reconnect: true });
+        // Se jogo em curso, manda estado actual
+        if (game.phase === "question" && !p.answered) {
+          const q = questions[game.qIndex];
+          send(ws, { type: "canAnswer", opcoes: q.opcoes });
+        } else if (game.phase === "reveal" || p.answered) {
+          send(ws, { type: "waiting", msg: "Aguarda a próxima pergunta…" });
+        }
+      } else if (game.phase !== "lobby") {
+        send(ws, { type: "error", msg: "O jogo já começou." });
+        return;
+      } else {
+        // Novo jogador no lobby
+        const names = [...game.players.values()].map(p => p.name.toLowerCase());
+        if (names.includes(name.toLowerCase())) {
+          send(ws, { type: "error", msg: "Nome já em uso." }); return;
+        }
+        game.players.set(ws, { name, score: 0, answered: false, answerIdx: -1, answerTime: 0 });
+        send(ws, { type: "joined", name });
+      }
       sendHosts({ type: "playerList", players: playerList() });
       return;
     }

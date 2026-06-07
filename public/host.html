@@ -181,6 +181,7 @@
     right: 14px;
     font-size: 1rem;
     opacity: .8;
+    display: none; /* escondido durante o jogo */
   }
   .optCard.wrong { opacity: .3; }
   .optCard.correct { outline: 5px solid #fff; }
@@ -288,6 +289,7 @@
   </div>
 
   <div id="optionsGrid"></div>
+  <div id="barChart" style="display:none; padding: 0 32px 16px; gap:12px; align-items:flex-end; justify-content:center; height:160px;"></div>
 
   <div id="statusBar">
     <div id="answerProgress">0 respostas</div>
@@ -426,6 +428,8 @@ function showQuestion(q) {
 
   document.getElementById("questionText").textContent = q.texto;
   document.getElementById("answerProgress").textContent = "0 respostas";
+  document.getElementById("barChart").style.display = "none";
+  document.getElementById("barChart").innerHTML = "";
   document.getElementById("revealBtn").style.display  = "inline-block";
   document.getElementById("rankingBtn").style.display = "none";
   document.getElementById("nextBtn").style.display    = "none";
@@ -512,23 +516,59 @@ function stopTimer() {
 }
 
 function updateOptionCounts(counts) {
+  // During question, just update internal counts but don't show them
+  if (!isRevealed) return;
   counts.forEach((c, i) => {
     const el = document.getElementById(`cnt${i}`);
-    if (el) el.textContent = c;
+    if (el) { el.textContent = c; el.style.display = "block"; }
   });
 }
 
 function revealOptions(correta, counts) {
-  if (currentQuestion) {
+  if (!currentQuestion) return;
+
+  // Fade options to show correct/wrong
+  currentQuestion.opcoes.forEach((_, i) => {
+    const el = document.getElementById(`opt${i}`);
+    if (!el) return;
+    if (i === correta) el.classList.add("correct");
+    else               el.classList.add("wrong");
+  });
+
+  // Show animated bar chart
+  if (!counts) return;
+  const total = counts.reduce((a,b) => a+b, 0) || 1;
+  const maxCount = Math.max(...counts, 1);
+  const chart = document.getElementById("barChart");
+  chart.style.display = "flex";
+
+  chart.innerHTML = currentQuestion.opcoes.map((opt, i) => {
+    const pct    = Math.round((counts[i] / maxCount) * 100);
+    const isCorr = i === correta;
+    const color  = isCorr ? "#2ecc71" : "#e74c3c";
+    const label  = LETTERS[i];
+    return `
+      <div style="display:flex;flex-direction:column;align-items:center;gap:6px;flex:1;max-width:160px">
+        <div style="font-size:1.1rem;font-weight:800;color:#fff">${counts[i]}</div>
+        <div style="width:100%;background:#333;border-radius:8px 8px 0 0;height:120px;display:flex;align-items:flex-end;overflow:hidden">
+          <div id="bar${i}" style="width:100%;height:0%;background:${color};border-radius:8px 8px 0 0;transition:height 1s ease;display:flex;align-items:flex-start;justify-content:center;padding-top:6px">
+            ${isCorr ? '<span style="font-size:1.4rem">✓</span>' : ''}
+          </div>
+        </div>
+        <div style="font-size:.95rem;color:#ccc;text-align:center">${label} ${opt}</div>
+      </div>`;
+  }).join("");
+
+  // Animate bars after short delay
+  setTimeout(() => {
     currentQuestion.opcoes.forEach((_, i) => {
-      const el = document.getElementById(`opt${i}`);
-      if (!el) return;
-      if (i === correta) el.classList.add("correct");
-      else               el.classList.add("wrong");
-      const cnt = document.getElementById(`cnt${i}`);
-      if (cnt && counts) cnt.textContent = counts[i];
+      const bar = document.getElementById(`bar${i}`);
+      if (bar) {
+        const pct = Math.round((counts[i] / maxCount) * 100);
+        bar.style.height = pct + "%";
+      }
     });
-  }
+  }, 100);
 }
 
 function revealNow() {
@@ -550,6 +590,8 @@ function nextQuestion() {
 
 function showRankingScreen(ranking, hasNext) {
   document.getElementById("questionScreen").style.display = "none";
+  document.getElementById("endScreen").style.display      = "none";
+  document.getElementById("lobby").style.display          = "none";
   document.getElementById("rankingScreen").style.display  = "flex";
 
   const medals = ["🥇","🥈","🥉"];
