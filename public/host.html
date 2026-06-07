@@ -283,6 +283,10 @@
   </div>
   <div id="videoMsg">▶ Vídeo a tocar — temporizador começa quando acabar</div>
 
+  <div id="imageWrap" style="display:none;justify-content:center;padding:0 32px 8px">
+    <img id="questionImg" src="" alt="" style="max-height:38vh;max-width:100%;border-radius:12px;object-fit:contain">
+  </div>
+
   <div id="optionsGrid"></div>
 
   <div id="statusBar">
@@ -448,6 +452,17 @@ function showQuestion(q) {
     videoWrap.style.display = "none";
     videoMsg.style.display  = "none";
     videoEl.src = "";
+  }
+
+  // Imagem
+  const imageWrap = document.getElementById("imageWrap");
+  const imgEl     = document.getElementById("questionImg");
+  if (q.imagem) {
+    imageWrap.style.display = "flex";
+    imgEl.src = `/images/${q.imagem}`;
+  } else {
+    imageWrap.style.display = "none";
+    imgEl.src = "";
   }
 
   // Opções

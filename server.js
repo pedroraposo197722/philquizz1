@@ -34,6 +34,18 @@ app.get("/qr",   async (req, res) => {
 const server = http.createServer(app);
 const wss    = new WebSocketServer({ server });
 
+// ── Heartbeat — mantém ligações vivas ────────────────────────
+const HEARTBEAT_INTERVAL = 25000; // 25 segundos
+function heartbeat() { this.isAlive = true; }
+
+setInterval(() => {
+  wss.clients.forEach(ws => {
+    if (ws.isAlive === false) { ws.terminate(); return; }
+    ws.isAlive = false;
+    ws.ping();
+  });
+}, HEARTBEAT_INTERVAL);
+
 // ── Estado do jogo ────────────────────────────────────────────
 const game = {
   phase:         "lobby",
@@ -88,6 +100,8 @@ function revealAnswers() {
 
 // ── WebSocket ─────────────────────────────────────────────────
 wss.on("connection", ws => {
+  ws.isAlive = true;
+  ws.on("pong", heartbeat);
   ws.on("message", raw => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
