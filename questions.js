@@ -45,10 +45,10 @@ module.exports = [
     correta: 3, tempo: 45
   },
 
-  // 6 — Onde vivem os irmãos
+  // 6 — Onde vivem irmã, cunhado e sobrinhas
   {
-    texto: "Où vivent ses frères et/ou sœurs?\nOnde vivem os irmãos e/ou irmãs?",
-    video: "", imagem: "", musica: "survivor.mp3",
+    texto: "Où vivent la sœur, le beau-frère et les nièces?\nOnde vivem a irmã, cunhado e sobrinhas?",
+    video: "", imagem: "image11.jpeg", musica: "survivor.mp3",
     opcoes: ["Bruxelles / Bruxelas", "Paris", "Lisbonne / Lisboa", "Toronto"],
     correta: 0, tempo: 45
   },
@@ -96,7 +96,7 @@ module.exports = [
   // 12 — Países onde NÃO vivem primos
   {
     texto: "Dans quels pays ne vivent PAS les cousins de Philippe?\nEm que países NÃO vivem os primos do Philippe?",
-    video: "", imagem: "image9.jpg", musica: "survivor.mp3",
+    video: "", imagem: "image9.jpg", imagem2: "image10.jpg", musica: "survivor.mp3",
     opcoes: ["Portugal", "Canada", "France / França", "États-Unis / EUA"],
     correta: 3, tempo: 45
   },
@@ -160,7 +160,7 @@ module.exports = [
   // 20 — Quantos países visitou
   {
     texto: "Combien de pays Philippe a-t-il déjà visités?\nQuantos países o Philippe já visitou?",
-    video: "", imagem: "image1.jpeg", musica: "survivor.mp3",
+    video: "", imagem: "", mapa: true, musica: "survivor.mp3",
     opcoes: ["27", "31", "41", "51"],
     correta: 2, tempo: 45
   },
@@ -168,7 +168,7 @@ module.exports = [
   // 21 — País não visitado
   {
     texto: "Lequel de ces pays Philippe n'a pas visité?\nQual destes países o Philippe não visitou?",
-    video: "", imagem: "image1.jpeg", musica: "survivor.mp3",
+    video: "", imagem: "", mapa: true, musica: "survivor.mp3",
     opcoes: ["Islande / Islândia", "Vietnam / Vietname", "Chili / Chile", "Maroc / Marrocos"],
     correta: 1, tempo: 45
   },

@@ -284,8 +284,12 @@
   </div>
   <div id="videoMsg">▶ Vídeo a tocar — temporizador começa quando acabar</div>
 
-  <div id="imageWrap" style="display:none;justify-content:center;padding:0 32px 8px">
-    <img id="questionImg" src="" alt="" style="max-height:38vh;max-width:100%;border-radius:12px;object-fit:contain">
+  <div id="imageWrap" style="display:none;justify-content:center;gap:12px;padding:0 32px 8px">
+    <img id="questionImg" src="" alt="" style="max-height:36vh;max-width:48%;border-radius:12px;object-fit:contain">
+    <img id="questionImg2" src="" alt="" style="max-height:36vh;max-width:48%;border-radius:12px;object-fit:contain;display:none">
+  </div>
+  <div id="mapWrap" style="display:none;justify-content:center;padding:0 32px 8px">
+    <canvas id="worldMap" width="860" height="420" style="border-radius:12px;background:#1a3a5c;max-width:100%"></canvas>
   </div>
 
   <div id="optionsGrid"></div>
@@ -470,12 +474,33 @@ function showQuestion(q) {
   // Imagem
   const imageWrap = document.getElementById("imageWrap");
   const imgEl     = document.getElementById("questionImg");
+  const imgEl2    = document.getElementById("questionImg2");
+  const mapWrap   = document.getElementById("mapWrap");
+
+  // World map
+  if (q.mapa) {
+    mapWrap.style.display = "flex";
+    drawWorldMap();
+  } else {
+    mapWrap.style.display = "none";
+  }
+
   if (q.imagem) {
     imageWrap.style.display = "flex";
     imgEl.src = `/images/${q.imagem}`;
+    imgEl.style.maxWidth = q.imagem2 ? "48%" : "100%";
+    if (q.imagem2) {
+      imgEl2.src = `/images/${q.imagem2}`;
+      imgEl2.style.display = "block";
+    } else {
+      imgEl2.style.display = "none";
+      imgEl2.src = "";
+    }
   } else {
     imageWrap.style.display = "none";
     imgEl.src = "";
+    imgEl2.style.display = "none";
+    imgEl2.src = "";
   }
 
   // Opções
@@ -629,6 +654,143 @@ function showEnd(ranking) {
         <div class="rankName">${p.name}</div>
         <div class="rankScore">${p.score} pts</div>
       </div>`).join("");
+}
+
+// ── Mapa do mundo divertido ───────────────────────────────────
+function drawWorldMap() {
+  const canvas = document.getElementById("worldMap");
+  const ctx    = canvas.getContext("2d");
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Fundo oceano
+  ctx.fillStyle = "#1a3a5c";
+  ctx.fillRect(0, 0, W, H);
+
+  // Gradiente oceano
+  const grad = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, W/2);
+  grad.addColorStop(0, "rgba(26,80,140,0.5)");
+  grad.addColorStop(1, "rgba(10,20,40,0.5)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Linhas de latitude
+  ctx.strokeStyle = "rgba(255,255,255,0.08)";
+  ctx.lineWidth = 1;
+  for (let lat = -60; lat <= 60; lat += 30) {
+    const y = H/2 - (lat/90)*(H/2);
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+  for (let lon = -180; lon <= 180; lon += 30) {
+    const x = (lon + 180) / 360 * W;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+
+  // Países visitados (polígonos simplificados)
+  // Formato: [nome, cor, [[lon,lat],...]]
+  const VISITED_COLOR   = "#f39c12";
+  const UNVISITED_COLOR = "#2ecc71";
+  const HIGHLIGHT_COLOR = "#e74c3c";
+
+  function proj(lon, lat) {
+    return [
+      (lon + 180) / 360 * W,
+      (90 - lat) / 180 * H
+    ];
+  }
+
+  function drawCountry(coords, color, label) {
+    ctx.beginPath();
+    coords.forEach(([lon, lat], i) => {
+      const [x, y] = proj(lon, lat);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.4)";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+    if (label) {
+      const cx = coords.reduce((s,[l])=>s+l,0)/coords.length;
+      const cy = coords.reduce((s,[,t])=>s+t,0)/coords.length;
+      const [px,py] = proj(cx,cy);
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 9px Arial";
+      ctx.textAlign = "center";
+      ctx.fillText(label, px, py+3);
+    }
+  }
+
+  // Continentes simplificados (polígonos grandes)
+  const continents = [
+    // Europa
+    [[-10,36],[30,36],[30,71],[-10,71]], 
+    // África
+    [[-18,37],[52,37],[52,-35],[-18,-35]],
+    // Ásia
+    [[26,10],[145,10],[145,77],[26,77]],
+    // Américas do Norte
+    [[-170,15],[-52,15],[-52,72],[-170,72]],
+    // Américas do Sul
+    [[-82,-56],[-34,-56],[-34,13],[-82,13]],
+    // Oceania
+    [[112,-47],[180,-47],[180,-10],[112,-10]],
+  ];
+  continents.forEach(c => drawCountry(c, "#27ae60", null));
+
+  // Países visitados em destaque laranja
+  const visitados = [
+    // Portugal
+    [[-9.5,37],[-6.2,37],[-6.2,42],[-9.5,42]],
+    // França
+    [[-5,43],[8,43],[8,51],[-5,51]],
+    // Bélgica
+    [[2.5,49.5],[6.4,49.5],[6.4,51.5],[2.5,51.5]],
+    // Espanha
+    [[-9,36],[3.3,36],[3.3,44],[-9,44]],
+    // México
+    [[-118,14],[-86,14],[-86,33],[-118,33]],
+    // Borneo/Malásia
+    [[108,-4],[119,-4],[119,7],[108,7]],
+    // Chile
+    [[-76,-56],[-66,-56],[-66,-17],[-76,-17]],
+    // Islândia
+    [[-25,63],[-13,63],[-13,66],[-25,66]],
+    // Marrocos
+    [[-13,28],[0,28],[0,36],[-13,36]],
+    // Japão
+    [[129,31],[146,31],[146,45],[129,45]],
+    // Austrália
+    [[113,-39],[154,-39],[154,-10],[113,-10]],
+  ];
+  visitados.forEach(c => drawCountry(c, VISITED_COLOR, null));
+
+  // Vietname NÃO visitado — destaque especial vermelho
+  drawCountry([[102,8],[109,8],[109,23],[102,23]], HIGHLIGHT_COLOR, null);
+
+  // Legenda
+  const legends = [
+    [VISITED_COLOR, "Países visitados / Pays visités"],
+    [HIGHLIGHT_COLOR, "Não visitado / Pas visité"],
+    ["#27ae60", "Outros / Autres"],
+  ];
+  legends.forEach(([col, txt], i) => {
+    ctx.fillStyle = col;
+    ctx.fillRect(16, 12 + i*22, 16, 14);
+    ctx.fillStyle = "#fff";
+    ctx.font = "12px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText(txt, 38, 24 + i*22);
+  });
+
+  // Título
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(W-200, 0, 200, 30);
+  ctx.fillStyle = "#f39c12";
+  ctx.font = "bold 13px Arial";
+  ctx.textAlign = "center";
+  ctx.fillText("🌍 41 países visitados", W-100, 20);
 }
 
 connect();
