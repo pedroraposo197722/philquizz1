@@ -261,7 +261,8 @@ wss.on("connection", ws => {
       p.answerIdx  = idx;
       p.answerTime = elapsed;
 
-      if (idx === q.correta) {
+      // correta: -1 significa que TODOS ganham pontos (ex: pergunta do PSG)
+      if (q.correta === -1 || idx === q.correta) {
         const speedBonus = Math.round(400 * Math.max(0, 1 - elapsed / maxTime));
         p.score += 600 + speedBonus;
       }

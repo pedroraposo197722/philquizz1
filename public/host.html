@@ -553,7 +553,7 @@ function revealOptions(correta, counts) {
 
   chart.innerHTML = currentQuestion.opcoes.map((opt, i) => {
     const pct    = Math.round((counts[i] / maxCount) * 100);
-    const isCorr = i === correta;
+    const isCorr = (correta === -1) || i === correta;
     const color  = isCorr ? "#2ecc71" : "#e74c3c";
     const label  = LETTERS[i];
     return `
