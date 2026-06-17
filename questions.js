@@ -106,7 +106,7 @@ module.exports = [
     texto: "Combien de nièces a Philippe?\nQuantas sobrinhas tem o Philippe?",
     video: "", imagem: "image11.jpeg", musica: "survivor.mp3",
     opcoes: ["2", "3", "4", "5"],
-    correta: 1, tempo: 45
+    correta: 2, tempo: 45
   },
 
   // 14 — Com que idade começou a esquiar
@@ -162,7 +162,7 @@ module.exports = [
     texto: "Combien de pays Philippe a-t-il déjà visités?\nQuantos países o Philippe já visitou?",
     video: "", imagem: "", mapa: true, musica: "survivor.mp3",
     opcoes: ["27", "31", "41", "51"],
-    correta: 2, tempo: 45
+    correta: 1, tempo: 45
   },
 
   // 21 — País não visitado

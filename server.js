@@ -35,7 +35,7 @@ const server = http.createServer(app);
 const wss    = new WebSocketServer({ server });
 
 // ── Heartbeat — mantém ligações vivas ────────────────────────
-const HEARTBEAT_INTERVAL = 25000; // 25 segundos
+const HEARTBEAT_INTERVAL = 10000; // 25 segundos
 function heartbeat() { this.isAlive = true; }
 
 setInterval(() => {

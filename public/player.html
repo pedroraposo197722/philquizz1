@@ -140,38 +140,86 @@ let ws, score = 0, myName = "", answered = false, canAnswer = false;
 
 let pingInterval = null;
 let playerName = "";
-let currentView = "joinView"; // track what screen we're on
+let reconnectTimer = null;
+let wsConnected = false;
 
 function connect() {
-  ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
-  ws.onmessage = e => handleMsg(JSON.parse(e.data));
+  // Cancel any pending reconnect
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+
+  try {
+    ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}`);
+  } catch(e) {
+    scheduleReconnect(); return;
+  }
+
   ws.onopen = () => {
-    // Ping every 15s to keep connection alive (below Railway's 60s timeout)
+    wsConnected = true;
+    // Ping every 10s — Android kills WS after ~30s of inactivity
     if (pingInterval) clearInterval(pingInterval);
     pingInterval = setInterval(() => {
-      if (ws.readyState === 1) ws.send(JSON.stringify({ type: "ping" }));
-    }, 15000);
-    // Auto-rejoin silently if we had a name (reconnection)
+      if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: "ping" }));
+      } else {
+        clearInterval(pingInterval);
+        scheduleReconnect();
+      }
+    }, 10000);
+    // Auto-rejoin silently if we had a name
     if (playerName) {
       ws.send(JSON.stringify({ type: "playerJoin", name: playerName }));
     }
   };
-  ws.onclose = () => {
-    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
-    // Reconnect quickly and silently
-    setTimeout(connect, 1000);
+
+  ws.onmessage = e => {
+    try { handleMsg(JSON.parse(e.data)); } catch(err) {}
   };
+
+  ws.onclose = () => {
+    wsConnected = false;
+    if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+    scheduleReconnect();
+  };
+
   ws.onerror = () => {
-    ws.close();
+    if (ws) ws.close();
   };
 }
 
-// Keep-alive via Page Visibility API — reconnect when tab becomes visible again
-document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && ws.readyState !== 1) {
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
     connect();
+  }, 1500);
+}
+
+// Reconecta quando o telemóvel sai do background (Android mata WS em background)
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    if (!ws || ws.readyState === 3 || ws.readyState === 2) {
+      connect();
+    }
   }
 });
+
+// Reconecta quando o telemóvel recupera internet
+window.addEventListener("online", () => {
+  if (!ws || ws.readyState !== 1) connect();
+});
+
+// Heartbeat via requestAnimationFrame para detectar quando o browser congela
+let lastHeartbeat = Date.now();
+function checkConnection() {
+  const now = Date.now();
+  // Se mais de 20s sem actividade e temos nome, forçar reconexão
+  if (now - lastHeartbeat > 20000 && playerName) {
+    if (!ws || ws.readyState !== 1) connect();
+  }
+  lastHeartbeat = now;
+  setTimeout(checkConnection, 5000);
+}
+checkConnection();
 
 function handleMsg(msg) {
   switch(msg.type) {
